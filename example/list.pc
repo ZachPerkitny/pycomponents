@@ -1,0 +1,4 @@
+html(list):
+    ul:
+        for i in list:
+            ListItem(val=i)
