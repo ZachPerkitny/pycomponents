@@ -13,5 +13,16 @@ class Section(ABC):
 
 class Renderable(ABC):
     @abstractmethod
-    def render(self, output, context):
+    def render(self, context):
         pass
+
+
+class RenderableList(Renderable):
+    def __init__(self, renderables):
+        self.renderables = renderables
+
+    def render(self, context):
+        output = ''
+        for renderable in self.renderables:
+            output += renderable.render(context)
+        return output
