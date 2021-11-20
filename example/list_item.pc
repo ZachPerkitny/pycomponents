@@ -1,3 +1,2 @@
-html(value):
-    li:
-        - {value}
+li:
+    - {value}

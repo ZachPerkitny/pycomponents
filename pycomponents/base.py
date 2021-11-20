@@ -2,13 +2,17 @@ from abc import ABC, abstractmethod
 
 
 class Section(ABC):
+    def __init__(self, source):
+        self.source = source
+        self.parser_result = self.parser.parse(self.source)
+
     @property
     @abstractmethod
     def parser(self):
         pass
 
-    def parse(self, text):
-        return self.parser.parse(text)
+    def render(self, context):
+        return self.parser_result.render(context)
 
 
 class Renderable(ABC):

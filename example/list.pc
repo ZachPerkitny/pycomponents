@@ -1,4 +1,5 @@
-html(list):
-    ul:
-        for i in list:
-            ListItem(val=i)
+@import './list_item'
+
+ul:
+    for i in list:
+        list_item(val=i)

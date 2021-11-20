@@ -1,60 +1,8 @@
-from abc import ABC, abstractmethod
-import html
-
 from lark import Lark, Transformer, v_args
 
 from .base import Renderable, RenderableList, Section
 from .indenter import ParserIndenter
-
-
-class Value(ABC):
-    def __init__(self, value):
-        self.value = value
-
-    @abstractmethod
-    def resolve(self, context):
-        pass
-
-
-class Primitive(Value):
-    def resolve(self, context):
-        return self.value
-
-
-class Array(Value):
-    def resolve(self, context):
-        res = []
-        for item in self.value:
-            res.append(item.resolve(context))
-        return res
-
-
-class Dictionary(Value):
-    def resolve(self, context):
-        res = {}
-        for key, value in self.value.items():
-            res[key.resolve(context)] = value.resolve(context)
-        return res
-
-
-class Function(Value):
-    def __init__(self, value, arguments):
-        super().__init__(value)
-        self.arguments = arguments
-
-    def resolve(self, context):
-        if self.value not in context:
-            return None
-        value = context[self.value]
-        if not callable(value):
-            return None
-        arguments = [arg.resolve(context) for arg in self.arguments]
-        return value(*arguments)
-
-
-class Variable(Value):
-    def resolve(self, context):
-        return context[self.value] if html.escape(self.value) in context else None
+from .value import *
 
 
 class Tag(Renderable):
@@ -83,19 +31,6 @@ class Attr(Renderable):
         return f'{self.key}="{self.value.resolve(context)}"'
 
 
-class TextLine(Renderable):
-    def __init__(self, parts):
-        self.parts = parts
-
-    def render(self, context):
-        output = ''
-        for part in self.parts:
-            output += part.resolve(context)
-        if output[0] == ' ':
-            output = output[1:]
-        return output
-
-
 class ForLoop(Renderable):
     def __init__(self, identifier, iterable, body):
         self.identifier = identifier
@@ -106,12 +41,38 @@ class ForLoop(Renderable):
         output = ''
         iterable = self.iterable.resolve(context)
         for i in iterable:
-            with context.push(i=i):
+            with context.push(**{self.identifier: i}):
                 output += self.body.render(context)
         return output
 
 
+class Assignment(Renderable):
+    def __init__(self, identifier, value):
+        self.identifier = identifier
+        self.value = value
+
+    def render(self, context):
+        context[self.identifier] = self.value.resolve(context)
+        return ''
+
+
+class TextLine(Renderable):
+    def __init__(self, parts):
+        self.parts = parts
+
+    def render(self, context):
+        output = ''
+        for part in self.parts:
+            output += str(part.resolve(context))
+        if output[0] == ' ':
+            output = output[1:]
+        return output
+
+
 class HTMLSectionTransformer(Transformer):
+    def start(self, stmts):
+        return RenderableList(stmts)
+
     @v_args(inline=True)
     def block(self, *blocks):
         return RenderableList(blocks)
@@ -124,8 +85,8 @@ class HTMLSectionTransformer(Transformer):
         return attrs
 
     @v_args(inline=True)
-    def tag(self, identifier, attrs, body):
-        return Tag(identifier, attrs, body)
+    def assignment(self, identifier, value):
+        return Assignment(str(identifier), value)
 
     @v_args(inline=True)
     def text(self, text):
@@ -137,6 +98,26 @@ class HTMLSectionTransformer(Transformer):
     @v_args(inline=True)
     def forloop(self, identifier, iterable, body):
         return ForLoop(identifier, iterable, body)
+
+    @v_args(inline=True)
+    def tag(self, identifier, attrs, body):
+        return Tag(identifier, attrs, body)
+
+    @v_args(inline=True)
+    def add(self, left, right):
+        return AddExpression(left, right)
+
+    @v_args(inline=True)
+    def sub(self, left, right):
+        return SubExpression(left, right)
+
+    @v_args(inline=True)
+    def mul(self, left, right):
+        return MulExpression(left, right)
+
+    @v_args(inline=True)
+    def div(self, left, right):
+        return DivExpression(left, right)
 
     pair = tuple
 
@@ -155,7 +136,11 @@ class HTMLSectionTransformer(Transformer):
         return Variable(str(value))
 
     @v_args(inline=True)
-    def number(self, value):
+    def integer(self, value):
+        return Primitive(int(value))
+
+    @v_args(inline=True)
+    def float(self, value):
         return Primitive(float(value))
 
     true = lambda self, _: Primitive(True)
@@ -169,31 +154,44 @@ class HTMLSectionTransformer(Transformer):
 
 class HTMLSection(Section):
     parser = Lark(r'''
-        ?start: _NL* compound
+        start: _NL* stmt+
         
-        ?compound: tag | forloop
-        ?simple: textline _NL
+        ?stmt: simple | compound
+        ?compound: forloop | tag
+        ?simple: (assignment | textline) _NL
         
-        block: _NL _INDENT (compound | simple)+ _DEDENT
+        block: _NL _INDENT stmt+ _DEDENT 
+        
+        forloop: "for" identifier "in" value ":" block
         
         attr: identifier "=" value
         attrs_list: "(" [attr ("," attr)*] ")"
         tag: identifier [attrs_list] ":" block
         
-        text: /[^{\r\n]+/
-        ?textexpr: "{" value "}"
+        assignment: "var" identifier "=" expression
+        
+        text: /[^{}\r\n]+/
+        ?textexpr: "{" expression "}"
         textline: "-" (text | textexpr)+
         
-        forloop: "for" identifier "in" value ":" block
+        ?expression: sum
+        ?sum: product
+            | sum "+" product -> add
+            | sum "-" product -> sub
+        ?product: value
+            | product "*" value -> mul
+            | product "/" value -> div
         
         ?value: dict
             | list
             | string
             | CNAME -> variable
-            | SIGNED_NUMBER -> number
+            | SIGNED_INT -> integer
+            | SIGNED_FLOAT -> float
             | "True" -> true
             | "False" -> false
             | "None" -> none
+            | "(" expression ")"
         dict: "{" [pair ("," pair)*] "}"
         pair: value ":" value
         list: "[" [value ("," value)*] "]"
@@ -203,7 +201,8 @@ class HTMLSection(Section):
 
         %import common.CNAME
         %import common.ESCAPED_STRING
-        %import common.SIGNED_NUMBER
+        %import common.SIGNED_FLOAT
+        %import common.SIGNED_INT
         
         %declare _INDENT _DEDENT
         
