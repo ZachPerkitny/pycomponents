@@ -17,7 +17,7 @@ def test_textline_expr():
 
 def test_if_stmt():
     source = textwrap.dedent('''
-    var test = True
+    test = True
     if test:
         - {test}
     else:
@@ -30,8 +30,8 @@ def test_if_stmt():
 
 def test_elif_stmt():
     source = textwrap.dedent('''
-        var test = False
-        var test2 = True
+        test = False
+        test2 = True
         if test:
             - {test}
         elif test2:
@@ -46,7 +46,7 @@ def test_elif_stmt():
 
 def test_else_stmt():
     source = textwrap.dedent('''
-        var test = False
+        test = False
         if test:
             - {test}
         else:
@@ -70,7 +70,7 @@ def test_forloop_stmt():
 
 def test_variable_assignment():
     source = textwrap.dedent('''
-    var my_variable = "test"
+    my_variable = "test"
     - my_variable is {my_variable}
     ''')
     context = Context()
@@ -80,8 +80,8 @@ def test_variable_assignment():
 
 def test_expression():
     source = textwrap.dedent('''
-    - my variable is {(10 + 25) * 30}
+    - my value is {(10 + 25) * 30}
     ''')
     context = Context()
     result = HTMLSection(source).render(context)
-    assert result == 'my variable is 1050'
+    assert result == 'my value is 1050'

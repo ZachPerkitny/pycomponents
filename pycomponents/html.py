@@ -189,7 +189,7 @@ class HTMLSection(Section):
         attrs_list: "(" [attr ("," attr)*] ")"
         tag: identifier [attrs_list] ":" block
         
-        assignment: "var" identifier "=" expression
+        assignment: identifier "=" expression
         
         text: /[^{}\r\n]+/
         ?textexpr: "{" expression "}"

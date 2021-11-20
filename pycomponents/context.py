@@ -12,7 +12,9 @@ class ContextDict(dict):
 
 
 class Context:
-    def __init__(self, context={}):
+    def __init__(self, context=None):
+        if context is None:
+            context = {}
         self.dicts = [context]
 
     def push(self, *args, **kwargs):
