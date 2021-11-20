@@ -5,7 +5,7 @@ from pycomponents.html import HTMLSection
 
 
 def test_textline_expr():
-    source = textwrap.dedent(r'''
+    source = textwrap.dedent('''
     li(class="test", id="test"):
         - Hello {msg}! 
         - {msg} was the message
@@ -15,8 +15,50 @@ def test_textline_expr():
     assert result == '<li class="test" id="test">Hello world! world was the message</li>'
 
 
-def test_html_section_outputs_html():
-    source = textwrap.dedent(r'''
+def test_if_stmt():
+    source = textwrap.dedent('''
+    var test = True
+    if test:
+        - {test}
+    else:
+        - Something
+    ''')
+    context = Context()
+    result = HTMLSection(source).render(context)
+    assert result == 'True'
+
+
+def test_elif_stmt():
+    source = textwrap.dedent('''
+        var test = False
+        var test2 = True
+        if test:
+            - {test}
+        elif test2:
+            - {test2}
+        else:
+            - Something
+        ''')
+    context = Context()
+    result = HTMLSection(source).render(context)
+    assert result == 'True'
+
+
+def test_else_stmt():
+    source = textwrap.dedent('''
+        var test = False
+        if test:
+            - {test}
+        else:
+            - Something
+        ''')
+    context = Context()
+    result = HTMLSection(source).render(context)
+    assert result == 'Something'
+
+
+def test_forloop_stmt():
+    source = textwrap.dedent('''
     for i in ["hello", "world"]:
         li(class="test"):
             - test {i}

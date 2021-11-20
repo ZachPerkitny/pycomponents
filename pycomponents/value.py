@@ -1,5 +1,4 @@
 from abc import ABC, abstractmethod
-import html
 
 
 class Value(ABC):
@@ -34,7 +33,7 @@ class Dictionary(Primitive):
 
 class Variable(Primitive):
     def resolve(self, context):
-        return html.escape(context[self.value]) if self.value in context else None
+        return context[self.value] if self.value in context else None
 
 
 class BinaryExpression(Value):

@@ -31,7 +31,20 @@ class Attr(Renderable):
         return f'{self.key}="{self.value.resolve(context)}"'
 
 
-class ForLoop(Renderable):
+class IfStmt(Renderable):
+    def __init__(self, expression, if_body, else_body):
+        self.expression = expression
+        self.if_body = if_body
+        self.else_body = else_body
+
+    def render(self, context):
+        res = self.expression.resolve(context)
+        if res:
+            return self.if_body.render(context)
+        return self.else_body.render(context)
+
+
+class ForStmt(Renderable):
     def __init__(self, identifier, iterable, body):
         self.identifier = identifier
         self.iterable = iterable
@@ -96,8 +109,12 @@ class HTMLSectionTransformer(Transformer):
         return TextLine(parts)
 
     @v_args(inline=True)
-    def forloop(self, identifier, iterable, body):
-        return ForLoop(identifier, iterable, body)
+    def ifstmt(self, expression, if_body, else_body):
+        return IfStmt(expression, if_body, else_body)
+
+    @v_args(inline=True)
+    def forstmt(self, identifier, iterable, body):
+        return ForStmt(identifier, iterable, body)
 
     @v_args(inline=True)
     def tag(self, identifier, attrs, body):
@@ -157,12 +174,16 @@ class HTMLSection(Section):
         start: _NL* stmt+
         
         ?stmt: simple | compound
-        ?compound: forloop | tag
+        ?compound: ifstmt | forstmt | tag
         ?simple: (assignment | textline) _NL
         
         block: _NL _INDENT stmt+ _DEDENT 
         
-        forloop: "for" identifier "in" value ":" block
+        ifstmt: "if" expression ":" block [elsestmt | elifstmt]
+        elifstmt: "elif" expression ":" block [elsestmt | elifstmt] -> ifstmt
+        ?elsestmt: "else" ":" block
+        
+        forstmt: "for" identifier "in" value ":" block
         
         attr: identifier "=" value
         attrs_list: "(" [attr ("," attr)*] ")"
